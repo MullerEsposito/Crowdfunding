@@ -1,34 +1,45 @@
-const assert = require("assert");
-const ganache = require("ganache");
-const { Web3 } = require("web3");
+import assert from "assert";
+import ganache from "ganache";
+import { Web3 } from "web3";
 
-const web3 = new Web3(ganache.provider());
+import CrowdfundingFactory from "../ethereum/build/CrowdfundingFactory.json" assert { type: "json" };
+import Crowdfunding from "../ethereum/build/Crowdfunding.json" assert { type: "json" };
 
-const compiledFactory = require("../ethereum/build/CrowdfundingFactory.json").CrowdfundingFactory;
-const compiledCrowdfunding = require("../ethereum/build/Crowdfunding.json").Crowdfunding;
-    
 const GAS_AMOUNT = "10000000";
 
 let accounts;
-let factory;
+let factoryContract;
 let crowdfundingAddress;
-let crowdfunding;
-let caller;
+let crowdfundingContract;
+let managerAccount;
+let requestAccount;
+let approverAccount;
+
+const providerOptions = { logging: { quiet: true } };
+const web3 = new Web3(ganache.provider(providerOptions));    
+const compiledFactory = CrowdfundingFactory.CrowdfundingFactory;
+const compiledCrowdfunding = Crowdfunding.Crowdfunding;
+
+const requestDescription = "Buy batteries";
+const requestValue = parseFloat(web3.utils.toWei("5", "ether"));
 
 beforeEach(async () => {
   accounts = await web3.eth.getAccounts();
-  caller = accounts[0];
-  factory = await new web3.eth.Contract(compiledFactory.abi)
-    .deploy({ data: compiledFactory.evm.bytecode.object })
-    .send({ from: caller, gas: GAS_AMOUNT });
+  managerAccount = accounts[0];
+  approverAccount = accounts[1];
+  requestAccount = accounts[2];
 
-  await factory.methods.createCrowdfunding("100").send({
-    from: caller,
+  factoryContract = await new web3.eth.Contract(compiledFactory.abi)
+    .deploy({ data: compiledFactory.evm.bytecode.object })
+    .send({ from: managerAccount, gas: GAS_AMOUNT });
+
+  await factoryContract.methods.createCrowdfunding("100").send({
+    from: managerAccount,
     gas: GAS_AMOUNT
   });
 
-  [crowdfundingAddress] = await factory.methods.getCrowdfundings().call();
-  crowdfunding = new web3.eth.Contract(
+  [crowdfundingAddress] = await factoryContract.methods.getCrowdfundings().call();
+  crowdfundingContract = new web3.eth.Contract(
     compiledCrowdfunding.abi,
     crowdfundingAddress
   );
@@ -36,29 +47,29 @@ beforeEach(async () => {
 
 describe("Crowdfunding", () => {
   it("should create a crowdfunding factory and a crowdfunding object.", async () => {
-    assert.ok(factory.options.address);
-    assert.ok(crowdfunding.options.address);
+    assert.ok(factoryContract.options.address);
+    assert.ok(crowdfundingContract.options.address);
   });
 
   it("should mark the caller as the crowdfunding manager.", async () => {
-    const manager = await crowdfunding.methods.manager().call();
-    assert.equal(manager, caller);
+    const manager = await crowdfundingContract.methods.manager().call();
+    assert.equal(manager, managerAccount);
   });
 
   it("should allow people to contribute money and marks them as approvers.", async () => {
-    await crowdfunding.methods.contribute().send({
+    await crowdfundingContract.methods.contribute().send({
       value: "200",
-      from: accounts[1]
+      from: approverAccount
     });
-    const isApprover = await crowdfunding.methods.approvers(accounts[1]).call();
+    const isApprover = await crowdfundingContract.methods.approvers(approverAccount).call();
     assert(isApprover);
   });
 
-  it("should not be able to do a contribution less than minimum.", async () => {
+  it("should not to be able to do a contribution less than minimum.", async () => {
     try {
-      await crowdfunding.methods.contribute().send({
+      await crowdfundingContract.methods.contribute().send({
         value: "100",
-        from: accounts[1]
+        from: approverAccount
       });
       assert(false);
     } catch (err) {
@@ -66,19 +77,81 @@ describe("Crowdfunding", () => {
     }
   });
 
-  it.only("should be able the manager to make a payment request.", async () => {
-    const requestDescription = "Buy batteries";
-    const requestValue = 200;
-    
-    const tx = await crowdfunding.methods.createRequest(requestDescription, requestValue, accounts[1]).send({
-      from: caller,
+  it("should be able to the manager to make a payment request.", async () => {    
+    await crowdfundingContract.methods.createRequest(requestDescription, requestValue, requestAccount).send({
+      from: managerAccount,
       value: GAS_AMOUNT,
-      gas: GAS_AMOUNT  // Example: Increase if needed
+      gas: GAS_AMOUNT
     });   
     
-    const createdRequest = await crowdfunding.methods.test(1).call({ from: caller });
+    const createdRequest = await crowdfundingContract.methods.requests(0).call({ from: managerAccount });
         
-    // assert.equal(createdRequest.description, requestDescription);
-    // assert.equal(createdRequest.value, requestValue);
-  })
+    assert.equal(createdRequest.description, requestDescription);
+    assert.equal(createdRequest.value, requestValue);
+  });
+
+  it("should not to be able a no approver to approve a request.", async () => {
+    await crowdfundingContract.methods.createRequest(requestDescription, requestValue, requestAccount).send({
+      from: managerAccount,
+      gas: GAS_AMOUNT
+    });
+
+    try {
+      await crowdfundingContract.methods.approveRequest(0).send({
+        from: requestAccount,
+        gas: GAS_AMOUNT
+      });
+      assert(false);
+    } catch(e) {
+      assert(true);
+    }
+  });
+
+  it("should be able to an approver to approve a request.", async () => {
+    await crowdfundingContract.methods.contribute().send({
+      value: web3.utils.toWei("10", "ether"),
+      from: approverAccount
+    });
+    
+    await crowdfundingContract.methods.createRequest(requestDescription, requestValue, requestAccount).send({
+      from: managerAccount,
+      gas: GAS_AMOUNT
+    });   
+    
+    await crowdfundingContract.methods.approveRequest(0).send({
+      from: approverAccount,
+      gas: GAS_AMOUNT
+    });
+
+    assert(await crowdfundingContract.methods.getRequestVoters(0, approverAccount).call());    
+  });
+
+  it("should process the entire cycle of the request.", async () => {
+    const initialSupplierBalanceInEther = parseFloat(web3.utils.fromWei(await web3.eth.getBalance(requestAccount), "ether"));    
+
+    await crowdfundingContract.methods.contribute().send({
+      value: web3.utils.toWei("10", "ether"),
+      from: approverAccount
+    });
+    
+    await crowdfundingContract.methods.createRequest(requestDescription, requestValue, requestAccount).send({
+      from: managerAccount,
+      gas: GAS_AMOUNT
+    });   
+    
+    await crowdfundingContract.methods.approveRequest(0).send({
+      from: approverAccount,
+      gas: GAS_AMOUNT
+    });
+
+    await crowdfundingContract.methods.finalizeRequest(0).send({
+      from: managerAccount,
+      gas: GAS_AMOUNT
+    });
+
+    const requestValueInEther = parseFloat(web3.utils.fromWei(requestValue, "ether"));
+    const finalSupplierBalanceInEther = parseFloat(web3.utils.fromWei(await web3.eth.getBalance(requestAccount), "ether"));
+    
+    assert.equal(finalSupplierBalanceInEther, initialSupplierBalanceInEther + requestValueInEther);
+  });
 });
