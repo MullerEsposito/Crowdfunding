@@ -8,8 +8,8 @@ contract Crowdfunding {
     address public manager;
     uint public minimumContribution;
     mapping(address => bool) public approvers;
+    uint public numberOfApprovers;
     Request[] public requests;
-    string[] public test;
 
     modifier restrictedToManager() {
         require(msg.sender == manager);
@@ -25,13 +25,8 @@ contract Crowdfunding {
         require(msg.value > minimumContribution);
 
         approvers[msg.sender] = true;
+        numberOfApprovers++;
     }
-
-    event testUpdated(string newValue);
-    function getTestArrayLength() public view returns (uint) {
-        return test.length;
-    }
-
 
     function createRequest(string memory description, uint value, address recipient) public payable restrictedToManager {
         // require(approvers[msg.sender]);
@@ -42,12 +37,9 @@ contract Crowdfunding {
         newRequest.isComplete = false;
         newRequest.yesVotes = 0;
 
-        test.push("a");
-        test.push("b");
-        test.push("c");
     }
 
-    function aproveRequest(uint index) public {
+    function approveRequest(uint index) public {
         Request storage request = requests[index];
 
         bool isVoter = approvers[msg.sender];
@@ -60,8 +52,17 @@ contract Crowdfunding {
         request.yesVotes++;
     }
 
-    function getRequest() public view returns (string memory description, uint value, address recipient, bool isComplete, uint yesVotes) {
-        Request storage request = requests[0];
-        return (request.description, request.value, request.recipient, request.isComplete, request.yesVotes);
+    function getRequestVoters(uint indexRequest, address addressVoter) public view returns(bool) {
+        return requests[indexRequest].voters[addressVoter];
+    }
+
+    function finalizeRequest(uint index) public restrictedToManager {
+        Request storage request = requests[index];
+
+        require(request.yesVotes > (numberOfApprovers / 2));
+        require(!request.isComplete);
+
+        payable(request.recipient).transfer(request.value);
+        request.isComplete = true;
     }
 }
