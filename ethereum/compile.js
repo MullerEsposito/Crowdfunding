@@ -1,19 +1,23 @@
-const fs = require("fs-extra");
-const path = require("path");
-const solc = require("solc");
+import pkg from "fs-extra";
+import path from "path";
+import solc from "solc";
+import { fileURLToPath } from "url";
 
-const { findImports, solcConfig } = require("./config");
+import { findImports, solcConfig } from "./config/index.js";
+const { removeSync, readFileSync, ensureDirSync, outputJSONSync } = pkg;
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 const buildPath = path.resolve(__dirname, "build");
 const crowdfundingPath = path.resolve(__dirname, "contracts", "CrowdfundingFactory.sol");
 
-fs.removeSync(buildPath);
-const source = fs.readFileSync(crowdfundingPath, "utf8");
+removeSync(buildPath);
+const source = readFileSync(crowdfundingPath, "utf8");
 const contracts = JSON.parse(solc.compile(JSON.stringify(solcConfig(source)), { import: findImports })).contracts;
-fs.ensureDirSync(buildPath);
+ensureDirSync(buildPath);
 
 for (let contract in contracts) {
-  fs.outputJsonSync(
+  outputJSONSync(
     path.resolve(buildPath, contract.replace(".sol", "").replace("contracts/", "") + ".json"),
     contracts[contract]
   );
