@@ -1,13 +1,13 @@
 import pkg from "fs-extra";
 import path from "path";
 import solc from "solc";
-import { fileURLToPath } from "url";
+
+import { getDirName } from "./config/index.js";
 
 import { findImports, solcConfig } from "./config/index.js";
 const { removeSync, readFileSync, ensureDirSync, outputJSONSync } = pkg;
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const __dirname = getDirName(import.meta.url);
 const buildPath = path.resolve(__dirname, "build");
 const crowdfundingPath = path.resolve(__dirname, "contracts", "CrowdfundingFactory.sol");
 
