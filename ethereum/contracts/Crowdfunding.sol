@@ -29,7 +29,6 @@ contract Crowdfunding {
     }
 
     function createRequest(string memory description, uint value, address recipient) public payable restrictedToManager {
-        // require(approvers[msg.sender]);
         Request storage newRequest = requests.push(); 
         newRequest.description = description;
         newRequest.value = value;
@@ -42,10 +41,10 @@ contract Crowdfunding {
     function approveRequest(uint index) public {
         Request storage request = requests[index];
 
-        bool isVoter = approvers[msg.sender];
+        bool isApprover = approvers[msg.sender];
         bool isNotAlreadyVoted = !request.voters[msg.sender];
         
-        require(isVoter);
+        require(isApprover);
         require(isNotAlreadyVoted);
 
         request.voters[msg.sender] = true;
