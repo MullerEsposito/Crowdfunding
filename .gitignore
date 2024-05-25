@@ -1,2 +1,4 @@
 node_modules
 ethereum/build
+.env
+ADDRESS
