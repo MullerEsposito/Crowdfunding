@@ -3,13 +3,17 @@ import { CardGroup, Button } from "semantic-ui-react";
 
 import factoryContract from "../ethereum/factoryContract";
 import Layout from "../components/Layout";
+import Link from "next/link";
 
 function App({ crowdfundings }) {
   const renderCrowdfundings = () => {
     const items = crowdfundings.map(address => {
       return {
         header: address,
-        description: <a>View Crowdfunding</a>,
+        description: (
+          <Link href={`/crowdfundings/${address}`} key={address}>
+            <a>View Crowdfunding</a>
+          </Link>),
         fluid: true
       };
     });
@@ -20,12 +24,14 @@ function App({ crowdfundings }) {
   return (
     <Layout>
       <h3>Open Crowdfundings</h3>
-      <Button
-        content="Create Crowdfunding"
-        icon="add circle"
-        floated="right"
-        primary
-      />
+      <Link href="/crowdfundings/new">
+        <Button
+          content="Create Crowdfunding"
+          icon="add circle"
+          floated="right"
+          primary
+        />
+      </Link>
       { renderCrowdfundings() }
     </Layout>
   );

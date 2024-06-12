@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Button, Form, FormField, Input, Message } from "semantic-ui-react";
-import { Router } from "../../routes.js"
+import { useRouter } from "next/router";
+
 
 import Layout from "../../components/Layout";
 import factoryContract from "../../ethereum/factoryContract";
@@ -10,6 +11,8 @@ function CrowdfundingNew() {
   const [minimumContribution, setMinimumContribution] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [loading, setLoading] = useState(false);
+  
+  const router = useRouter();
 
   const onSubmit = async e => {
     e.preventDefault();
@@ -21,7 +24,7 @@ function CrowdfundingNew() {
       await factoryContract.methods.createCrowdfunding(minimumContribution).send({
         from: accounts[0]
       });
-      Router.pushRoute("/");
+      router.push("/");
     } catch (error) {
       setErrorMessage(error.message);
     }

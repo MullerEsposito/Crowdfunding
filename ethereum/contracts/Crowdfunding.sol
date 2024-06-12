@@ -3,6 +3,7 @@
 pragma solidity ^0.8;
 
 import "../structs/Request.sol";
+import "../structs/Summary.sol";
 
 contract Crowdfunding {
     address public manager;
@@ -64,4 +65,19 @@ contract Crowdfunding {
         payable(request.recipient).transfer(request.value);
         request.isComplete = true;
     }
+
+    function getSummary() public view returns (Summary memory) {
+        return (Summary(
+            minimumContribution,
+            address(this).balance,
+            requests.length,
+            numberOfApprovers,
+            manager
+        ));
+    }
+
+    function getRequestsCount() public view returns (uint) {
+        return requests.length;
+    }
+    
 }

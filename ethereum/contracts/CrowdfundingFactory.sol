@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8;
 
-import "./Crowdfunding.sol";
+import "../contracts/Crowdfunding.sol";
 
 contract CrowdfundingFactory {
     Crowdfunding[] crowdfundings;

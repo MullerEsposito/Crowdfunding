@@ -14,6 +14,7 @@ const __dirname = getDirName(import.meta.url);
 const findImports = (importPath) => {
   try {
     const filePath = path.resolve(__dirname, "..", importPath);
+console.log(filePath);
     
     return { contents: fs.readFileSync(filePath, 'utf8') };
   } catch (error) {
